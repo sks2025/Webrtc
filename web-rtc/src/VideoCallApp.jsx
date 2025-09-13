@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Video, VideoOff, Mic, MicOff, PhoneOff, MessageCircle, Users, Copy, Check } from 'lucide-react';
 import io from 'socket.io-client';
+import CameraComponent from './startCamera';
 
 // Real Socket.IO client connection
 const useSocket = () => {
@@ -76,6 +77,14 @@ const VideoCallApp = () => {
   const remoteVideoRefs = useRef({});
 
   const { socket, connected } = useSocket();
+
+  // Ensure video element gets the stream when it becomes available
+  useEffect(() => {
+    if (localStreamRef.current && localVideoRef.current && !localVideoRef.current.srcObject) {
+      console.log('Setting delayed video srcObject...');
+      localVideoRef.current.srcObject = localStreamRef.current;
+    }
+  }, [joined, localStreamRef.current]);
 
   // Socket event listeners
   useEffect(() => {
@@ -292,20 +301,64 @@ const VideoCallApp = () => {
   // Get user media
   const getUserMedia = async () => {
     try {
+      console.log('Requesting camera and microphone access...');
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        },
         audio: true
       });
       
+      console.log('Media stream obtained:', stream);
+      console.log('Video tracks:', stream.getVideoTracks());
+      console.log('Audio tracks:', stream.getAudioTracks());
+      
       localStreamRef.current = stream;
+      
+      // Wait for video element to be ready
       if (localVideoRef.current) {
+        console.log('Setting video srcObject...');
         localVideoRef.current.srcObject = stream;
+        
+        // Add event listeners for debugging
+        localVideoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded');
+        };
+        
+        localVideoRef.current.oncanplay = () => {
+          console.log('Video can play');
+        };
+        
+        localVideoRef.current.onplay = () => {
+          console.log('Video started playing');
+        };
+        
+        localVideoRef.current.onerror = (error) => {
+          console.error('Video error:', error);
+        };
+      } else {
+        console.error('localVideoRef.current is null');
       }
       
       return stream;
     } catch (error) {
       console.error('Error accessing media devices:', error);
-      alert('Could not access camera/microphone. Please check permissions.');
+      console.error('Error details:', error);
+      
+      let errorMessage = 'Could not access camera/microphone. ';
+      if (error.name === 'NotAllowedError') {
+        errorMessage += 'Please allow camera and microphone permissions.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage += 'No camera or microphone found.';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage += 'Camera or microphone is being used by another application.';
+      } else {
+        errorMessage += 'Please check your device settings.';
+      }
+      
+      alert(errorMessage);
       throw error;
     }
   };
@@ -566,10 +619,20 @@ const VideoCallApp = () => {
                   muted
                   playsInline
                   className="w-full h-full object-cover"
+                  style={{ backgroundColor: '#1f2937' }}
                 />
+
+                {/* Debug info - remove this in production */}
+                <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
+                  Stream: {localStreamRef.current ? '✅' : '❌'} | 
+                  Video: {localVideoRef.current?.srcObject ? '✅' : '❌'}
+                </div>
+
                 <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-sm font-medium border border-white/20">
                   <span className="text-green-400">●</span> {userName} (You)
                 </div>
+                
+                {/* Show when video is off */}
                 {!isVideoOn && (
                   <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
                     <div className="text-center">
@@ -577,6 +640,19 @@ const VideoCallApp = () => {
                         <VideoOff className="w-8 h-8 text-red-400" />
                       </div>
                       <p className="text-gray-300 font-medium text-sm">Video Off</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Show when no stream is available */}
+                {isVideoOn && !localStreamRef.current && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-3 border border-yellow-500/30">
+                        <Video className="w-8 h-8 text-yellow-400" />
+                      </div>
+                      <p className="text-gray-300 font-medium text-sm">Loading Camera...</p>
+                      <p className="text-gray-400 text-xs mt-1">Please allow camera permissions</p>
                     </div>
                   </div>
                 )}
