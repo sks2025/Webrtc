@@ -11,7 +11,7 @@ const useSocket = () => {
     console.log('Attempting to connect to server...');
     
     // Connect to backend server
-    const newSocket = io('http://localhost:5000', {
+    const newSocket = io('http://93.127.213.176:5000', {
       cors: {
         origin: "http://localhost:5173",
         methods: ["GET", "POST"]
