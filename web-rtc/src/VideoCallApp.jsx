@@ -12,7 +12,7 @@ const useSocket = () => {
     console.log('Attempting to connect to server...');
     
     // Connect to backend server
-    const newSocket = io('http://93.127.213.176:5000', {
+    const newSocket = io('https://api.stechooze.com', {
       cors: {
         origin: "http://localhost:5173",
         methods: ["GET", "POST"]
